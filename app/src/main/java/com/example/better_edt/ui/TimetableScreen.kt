@@ -23,11 +23,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Schedule
@@ -36,6 +38,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -161,17 +165,23 @@ fun TimetableScreen(viewModel: EdtViewModel) {
                         onClick = { viewModel.refreshSchedule() },
                         enabled = !isLoading,
                         shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.height(36.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = MaterialTheme.colorScheme.onPrimary
                         )
                     ) {
                         Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Télécharger", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Télécharger", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Button between Download and Fullscreen to select a previously downloaded version
+                        VersionSelectionMenu(viewModel = viewModel)
+
+                        Spacer(modifier = Modifier.width(2.dp))
+
                         // Fullscreen Landscape Toggle Button
                         IconButton(
                             onClick = { viewModel.toggleFullscreenLandscape(context) },
@@ -192,7 +202,10 @@ fun TimetableScreen(viewModel: EdtViewModel) {
                             color = MaterialTheme.colorScheme.background,
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
                         ) {
-                            Row(modifier = Modifier.padding(2.dp)) {
+                            Row(
+                                modifier = Modifier.padding(2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Surface(
                                     modifier = Modifier
                                         .clip(CircleShape)
@@ -203,8 +216,10 @@ fun TimetableScreen(viewModel: EdtViewModel) {
                                         text = "Grille",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        softWrap = false,
                                         color = if (viewMode == ViewMode.WEEK_GRID) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                                     )
                                 }
                                 Surface(
@@ -217,8 +232,10 @@ fun TimetableScreen(viewModel: EdtViewModel) {
                                         text = "Liste",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        softWrap = false,
                                         color = if (viewMode == ViewMode.DAY_LIST) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                                     )
                                 }
                             }
@@ -358,7 +375,11 @@ fun FullscreenLandscapeTimetableScreen(viewModel: EdtViewModel) {
                         Icon(Icons.Default.Download, contentDescription = "Rafraîchir", modifier = Modifier.size(18.dp))
                     }
 
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+
+                    VersionSelectionMenu(viewModel = viewModel)
+
+                    Spacer(modifier = Modifier.width(4.dp))
 
                     // Exit Fullscreen Button
                     IconButton(
@@ -808,5 +829,98 @@ fun getEventColors(courseType: String): Triple<Color, Color, Color> { // (Backgr
         "TP" -> if (isDark) Triple(TpOrangeContainerDark, TextHighEmphasisDark, TpOrangeLight) else Triple(TpOrangeContainerLight, TpOrangeDark, TpOrangeLight.copy(alpha = 0.5f))
         "REUNION" -> if (isDark) Triple(ReunionPurpleContainerDark, TextHighEmphasisDark, ReunionPurpleLight) else Triple(ReunionPurpleContainerLight, ReunionPurpleDark, ReunionPurpleLight.copy(alpha = 0.5f))
         else -> if (isDark) Triple(DeepDarkSurfaceVariant, TextHighEmphasisDark, MaterialTheme.colorScheme.outline) else Triple(LightSurfaceVariant, TextHighEmphasisLight, MaterialTheme.colorScheme.outline)
+    }
+}
+
+@Composable
+fun VersionSelectionMenu(
+    viewModel: EdtViewModel,
+    modifier: Modifier = Modifier
+) {
+    val downloadedVersions by viewModel.downloadedVersions.collectAsState()
+    val selectedVersionId by viewModel.selectedVersionId.collectAsState()
+    var showMenu by remember { mutableStateOf(false) }
+
+    Box(modifier = modifier) {
+        IconButton(
+            onClick = { showMenu = true },
+            modifier = Modifier.size(36.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.History,
+                contentDescription = "Sélectionner une version antérieure",
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        DropdownMenu(
+            expanded = showMenu,
+            onDismissRequest = { showMenu = false }
+        ) {
+            Text(
+                text = "VERSIONS TÉLÉCHARGÉES",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+            )
+            HorizontalDivider()
+
+            if (downloadedVersions.isEmpty()) {
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = "Aucune version enregistrée",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    },
+                    onClick = { showMenu = false },
+                    enabled = false
+                )
+            } else {
+                downloadedVersions.forEachIndexed { index, version ->
+                    val isSelected = version.id == selectedVersionId
+                    val tag = if (index == 0) "Dernière" else "Version ${index + 1}"
+
+                    DropdownMenuItem(
+                        text = {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column {
+                                    Text(
+                                        text = tag,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.sp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = version.formattedDate,
+                                        fontSize = 12.sp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                if (isSelected) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Sélectionné",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        },
+                        onClick = {
+                            viewModel.selectVersion(version.id)
+                            showMenu = false
+                        }
+                    )
+                }
+            }
+        }
     }
 }

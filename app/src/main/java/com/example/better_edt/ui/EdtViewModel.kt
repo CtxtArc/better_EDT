@@ -9,6 +9,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.better_edt.data.ConfigRepository
 import com.example.better_edt.data.CourseConfig
+import com.example.better_edt.data.DownloadedVersion
+import com.example.better_edt.data.VersionRepository
+import com.example.better_edt.data.toEdtEvent
 import com.example.better_edt.model.EdtEvent
 import com.example.better_edt.network.EdtFilterEngine
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +30,7 @@ enum class ViewMode {
 class EdtViewModel(application: Application) : AndroidViewModel(application) {
 
     private val configRepository = ConfigRepository(application)
+    private val versionRepository = VersionRepository(application)
     private val filterEngine = EdtFilterEngine()
 
     private val _config = MutableStateFlow(CourseConfig())
@@ -34,6 +38,12 @@ class EdtViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _events = MutableStateFlow<List<EdtEvent>>(emptyList())
     val events: StateFlow<List<EdtEvent>> = _events.asStateFlow()
+
+    private val _downloadedVersions = MutableStateFlow<List<DownloadedVersion>>(emptyList())
+    val downloadedVersions: StateFlow<List<DownloadedVersion>> = _downloadedVersions.asStateFlow()
+
+    private val _selectedVersionId = MutableStateFlow<String?>(null)
+    val selectedVersionId: StateFlow<String?> = _selectedVersionId.asStateFlow()
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -55,6 +65,7 @@ class EdtViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         loadConfig()
+        loadDownloadedVersions()
         refreshSchedule()
     }
 
@@ -130,6 +141,23 @@ class EdtViewModel(application: Application) : AndroidViewModel(application) {
         refreshSchedule()
     }
 
+    fun loadDownloadedVersions() {
+        val versions = versionRepository.loadVersions()
+        _downloadedVersions.value = versions
+        if (versions.isNotEmpty() && _events.value.isEmpty()) {
+            _selectedVersionId.value = versions.first().id
+            _events.value = versions.first().events.map { it.toEdtEvent() }
+        }
+    }
+
+    fun selectVersion(versionId: String) {
+        val version = _downloadedVersions.value.find { it.id == versionId }
+        if (version != null) {
+            _selectedVersionId.value = versionId
+            _events.value = version.events.map { it.toEdtEvent() }
+        }
+    }
+
     fun refreshSchedule() {
         viewModelScope.launch {
             _isLoading.value = true
@@ -146,6 +174,10 @@ class EdtViewModel(application: Application) : AndroidViewModel(application) {
                     endDate = sunday
                 )
                 _events.value = fetchedEvents
+
+                val updatedVersions = versionRepository.saveVersion(fetchedEvents)
+                _downloadedVersions.value = updatedVersions
+                _selectedVersionId.value = updatedVersions.firstOrNull()?.id
             } catch (e: Exception) {
                 e.printStackTrace()
                 _errorMessage.value = "Erreur lors du téléchargement de l'emploi du temps: ${e.message}"
